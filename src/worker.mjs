@@ -122,7 +122,7 @@ class VendorPushNotificationWorker {
                     case 1:
                         fails++
                         this.logger.warn(` [x] Push notification não foi enviado, token não foi localizado`)
-                        pNModel?.destroy()
+                        await pNModel?.destroy()
                         break
                 }
             }
