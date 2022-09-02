@@ -25,6 +25,11 @@ spec:
           name: vendor-push-notification-worker
           securityContext:
             allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - all
+            privileged: false
+            readOnlyRootFilesystem: true
           env:
             - name: ENV
               value: "PROD"
