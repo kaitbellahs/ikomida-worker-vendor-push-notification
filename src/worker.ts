@@ -38,7 +38,7 @@ class VendorPushNotificationWorker {
     async processMessages(message: ConsumeMessage, channel: Channel) {
         try {
             this.logger.log(` [x] ${message.fields.routingKey}: message received: '${message.content.toString('utf8')}'`)
-            const payloadObject = JSON.parse(message.content.toString('utf8')) as Types.Interfaces.IAMQPPayload<Types.Interfaces.IAMQPPayloadObject>
+            const payloadObject: Types.Classes.CAMQPPayload<string> = Types.Classes.CAMQPPayload.fromObject(JSON.parse(message.content.toString('utf8')))
             if (payloadObject.method !== 'sendVendorPushNotifications') {
                 this.logger.log(` [Error]: O metodo: ${payloadObject?.method} não suportado!`)
                 channel.ack(message)
@@ -50,7 +50,7 @@ class VendorPushNotificationWorker {
             }
             const vendorPNMessageModel = await DBModels.VendorPNMessageModel.findOne({
                 where: {
-                    id: payloadObject.object,
+                    id: String(payloadObject.object),
                 },
                 include: [{
                     model: DBModels.ContractModel,
@@ -78,9 +78,9 @@ class VendorPushNotificationWorker {
             const notification = new Utils.Notification(Utils.Notification.VENDOR_MESSAGE)
             notification.title = vendorPNMessageModel?.title ?? ''
             notification.body = vendorPNMessageModel?.body ?? ''
-            const payload = new Types.Interfaces.INotificationPayload({
+            const payload: Types.Classes.CNotificationPayload = Types.Classes.CNotificationPayload.fromObject({
                 notification,
-                data: new Types.Interfaces.INotificationData({
+                data: Types.Classes.CNotificationData.fromObject({
                     method: notification?.method,
                     uri: notification?.uri,
                     logon: notification?.logon,
@@ -131,7 +131,7 @@ class VendorPushNotificationWorker {
         return false
     }
 
-    async sendPushNotificationByToken(model?: DBModels.PNMessageModel, message?: Types.Interfaces.INotificationPayload, platform?: string) {
+    async sendPushNotificationByToken(model?: DBModels.PNMessageModel, message?: Types.Classes.CNotificationPayload, platform?: string) {
         let response: Types.Types.TSendReturn = { code: -1 }
         try {
             if (platform === 'android') {
