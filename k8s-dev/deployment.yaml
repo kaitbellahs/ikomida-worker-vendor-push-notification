@@ -19,8 +19,8 @@ spec:
         - image: hub.docker.internal:5000/ikomida/vendor-push-notification-worker-image:latest
           name: vendor-push-notification-worker
           env:
-            - name: ENV
-              value: "DEV"
+            - name: NODE_ENV
+              value: "development"
             - name: GOOGLEADMIN
               valueFrom:
                 secretKeyRef:
