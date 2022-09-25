@@ -126,7 +126,7 @@ class VendorPushNotificationWorker {
             await vendorPNMessageModel.save()
             channel.ack(message)
         } catch (error: any) {
-            console.error(error)
+            this.logger.error(error)
         }
         return false
     }
