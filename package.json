@@ -1,6 +1,6 @@
 {
   "name": "ikomida-vendor-notification-worker",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "ikomida push vendor-notification worker",
   "private": true,
   "module": "build/worker.js",
