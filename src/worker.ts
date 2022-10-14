@@ -30,6 +30,7 @@ class VendorPushNotificationWorker {
   }
 
   async processMessages(message: ConsumeMessage, channel: Channel) {
+    let transaction: Domain.SqlDB.Transaction | undefined = undefined
     try {
       this.logger.log(` [x] ${message.fields.routingKey}: message received: '${message.content.toString('utf8')}'`)
       const payloadObject: Types.Classes.CAMQPPayload<string> = Types.Classes.CAMQPPayload.fromObject(
@@ -94,15 +95,20 @@ class VendorPushNotificationWorker {
       let fails = 0
       for (const userModel of vendorPNMessageModel?.contract?.users ?? []) {
         const pNModel = userModel?.pN
-        const pNMessageModel: DBModels.PNMessageModel | undefined = await pNModel?.$create('pNMessage', {
-          title: payload?.notification?.title,
-          body: payload?.notification?.body
+        transaction = await Domain.SqlDB.sequelize.transaction({
+          autocommit: false
         })
-        if (pNMessageModel) {
-          await vendorPNMessageModel.$add('pNMessage', pNMessageModel)
-          await vendorPNMessageModel?.contract?.$add('pNMessage', pNMessageModel)
-          await userModel.$add('pNMessage', pNMessageModel)
-        }
+        const pNMessageModel: DBModels.PNMessageModel | undefined = await pNModel?.$create(
+          'pNMessage',
+          {
+            title: payload?.notification?.title,
+            body: payload?.notification?.body,
+            vendorPNMessageId: vendorPNMessageModel.id,
+            userId: userModel.id,
+            contractId: vendorPNMessageModel?.contract?.id
+          },
+          { transaction }
+        )
         if (payload.data) {
           payload.data.message = pNMessageModel?.id
         }
@@ -110,13 +116,16 @@ class VendorPushNotificationWorker {
         payload.id = pNMessageModel?.id
         payload.priority = 5
         payload.ikomidaId = vendorPNMessageModel?.contract?.ikomidaID
-        const response = await this.sendPushNotificationByToken(pNMessageModel, payload, pNModel?.platform)
+        const response = await this.sendPushNotificationByToken(pNMessageModel, payload, transaction, pNModel?.platform)
         switch (response?.code) {
           case 0:
+            await transaction.commit()
             sends++
             this.logger.log(` [x] Push notification enviado com sucesso`)
             break
           case 1:
+          default:
+            await transaction.rollback()
             fails++
             this.logger.warn(` [x] Push notification não foi enviado, token não foi localizado`)
             await pNModel?.destroy()
@@ -129,6 +138,7 @@ class VendorPushNotificationWorker {
       channel.ack(message)
       return true
     } catch (error: any) {
+      await transaction?.rollback()
       this.logger.error(error)
     }
     channel.nack(message)
@@ -138,6 +148,7 @@ class VendorPushNotificationWorker {
   async sendPushNotificationByToken(
     model?: DBModels.PNMessageModel,
     message?: Types.Classes.CNotificationPayload,
+    transaction?: Domain.SqlDB.Transaction,
     platform?: string
   ) {
     let response: Types.Types.TSendReturn = { code: -1 }
@@ -150,7 +161,7 @@ class VendorPushNotificationWorker {
       if (response?.code === 0 && model) {
         model.remoteId = response?.id
         model.send = true
-        model.save()
+        model.save({ transaction })
       }
     } catch (error: any) {
       this.logger.log('message:', message)
