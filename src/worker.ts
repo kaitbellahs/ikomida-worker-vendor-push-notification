@@ -29,7 +29,8 @@ class VendorPushNotificationWorker {
     }
   }
 
-  async processMessages(message: ConsumeMessage, channel: Channel) {
+  async processMessages(message: ConsumeMessage, inchannel?: Channel) {
+    const channel = inchannel!
     let transaction: Domain.SqlDB.Transaction | undefined = undefined
     try {
       this.logger.log(` [x] ${message.fields.routingKey}: message received: '${message.content.toString('utf8')}'`)
@@ -46,6 +47,7 @@ class VendorPushNotificationWorker {
         return false
       }
       const vendorPNMessageModel = await DBModels.VendorPNMessageModel.findOne({
+        subQuery: false,
         where: {
           id: String(payloadObject.object)
         },
@@ -67,7 +69,7 @@ class VendorPushNotificationWorker {
                     required: true
                   }
                 ],
-                required: false
+                required: true
               }
             ]
           }
@@ -123,12 +125,19 @@ class VendorPushNotificationWorker {
             sends++
             this.logger.log(` [x] Push notification enviado com sucesso`)
             break
-          case 1:
           default:
             await transaction.rollback()
+            transaction = undefined
             fails++
-            this.logger.warn(` [x] Push notification não foi enviado, token não foi localizado`)
-            await pNModel?.destroy()
+            switch (response?.code) {
+              case 1:
+                this.logger.warn(` [x] Push notification não foi enviado, token não foi localizado`)
+                await pNModel?.destroy()
+                break
+              default:
+                this.logger.warn(` [x] Push notification não foi enviado`)
+                break
+            }
             break
         }
       }
@@ -142,6 +151,7 @@ class VendorPushNotificationWorker {
       this.logger.error(error)
     }
     channel.nack(message)
+    this.logger.log(` [x] Push notification enviar menssagens termino.`)
     return false
   }
 
@@ -161,7 +171,7 @@ class VendorPushNotificationWorker {
       if (response?.code === 0 && model) {
         model.remoteId = response?.id
         model.send = true
-        model.save({ transaction })
+        await model.save({ transaction })
       }
     } catch (error: any) {
       this.logger.log('message:', message)
