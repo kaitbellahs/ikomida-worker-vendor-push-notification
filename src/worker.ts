@@ -111,6 +111,11 @@ class VendorPushNotificationWorker {
           },
           { transaction }
         )
+        if (!pNMessageModel) {
+          await transaction.rollback()
+          transaction = undefined
+          continue
+        }
         if (payload.data) {
           payload.data.message = pNMessageModel?.id
         }
@@ -156,8 +161,8 @@ class VendorPushNotificationWorker {
   }
 
   async sendPushNotificationByToken(
-    model?: DBModels.PNMessageModel,
-    message?: Types.Classes.CNotificationPayload,
+    model: DBModels.PNMessageModel,
+    message: Types.Classes.CNotificationPayload,
     transaction?: Domain.SqlDB.Transaction,
     platform?: string
   ) {
