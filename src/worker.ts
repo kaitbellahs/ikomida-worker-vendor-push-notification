@@ -60,7 +60,7 @@ class VendorPushNotificationWorker {
                 model: DBModels.UserModel,
                 where: {
                   role: {
-                    [Domain.SqlDB.Op.in]: [BackendTypes.Roles.CLIENT]
+                    [Domain.SqlDB.Op.in]: [Types.Types.TRoles.CLIENT]
                   }
                 },
                 include: [
